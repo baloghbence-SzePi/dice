@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Virtuális Kockadobó – 4 oldalú (A–D) és 8 oldalú (1–8)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes diceShake {
+      0%   { transform: rotate(0deg) scale(1); }
+      20%  { transform: rotate(-10deg) scale(1.06); }
+      40%  { transform: rotate(9deg) scale(1.08); }
+      60%  { transform: rotate(-7deg) scale(1.06); }
+      80%  { transform: rotate(6deg) scale(1.04); }
+      100% { transform: rotate(0deg) scale(1); }
+    }
+    @keyframes popIn {
+      0%   { transform: scale(0.75); opacity: 0; }
+      70%  { transform: scale(1.08); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .rolling {
+      animation: diceShake 0.28s infinite ease-in-out;
+    }
+    .result-pop {
+      animation: popIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col items-center justify-center p-4 select-none">
+
+  <main class="w-full max-w-2xl bg-slate-800/90 border border-slate-700 rounded-3xl shadow-2xl p-6 md:p-9">
+    <!-- Fejléc -->
+    <div class="text-center mb-8">
+      <span class="text-xs font-bold uppercase tracking-widest text-amber-400">Véletlenszerű sorsoló</span>
+      <h1 class="text-2xl md:text-3xl font-extrabold text-white mt-1">Virtuális Kockadobás</h1>
+      <p class="text-xs md:text-sm text-slate-400 mt-1">1. lépés: 4 oldalú betűkocka (A–D) · 2. lépés: 8 oldalú számkocka (1–8)</p>
+    </div>
+
+    <!-- Két kocka egymás mellett -->
+    <div class="grid grid-cols-2 gap-4 md:gap-8 items-center mb-7">
+      
+      <!-- 4 OLDALÚ KOCKA (A, B, C, D) -->
+      <div class="flex flex-col items-center">
+        <span class="text-xs font-bold uppercase tracking-wider text-indigo-300 mb-3">1. Kocka · 4 oldalú (A–D)</span>
+        <div id="dice-letter-box" class="relative w-36 h-36 md:w-44 md:h-44 flex items-center justify-center transition-all duration-200">
+          <!-- Tetraéder / d4 SVG háttér -->
+          <svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-xl">
+            <polygon id="poly-letter" points="100,14 188,168 12,168"
+              fill="#312e81" stroke="#818cf8" stroke-width="6" stroke-linejoin="round" />
+            <line x1="100" y1="14" x2="100" y2="118" stroke="#6366f1" stroke-width="2.5" stroke-opacity="0.45" />
+            <line x1="188" y1="168" x2="100" y2="118" stroke="#6366f1" stroke-width="2.5" stroke-opacity="0.45" />
+            <line x1="12" y1="168" x2="100" y2="118" stroke="#6366f1" stroke-width="2.5" stroke-opacity="0.45" />
+          </svg>
+          <span id="letter-value" class="absolute top-[56%] -translate-y-1/2 text-4xl md:text-5xl font-black text-white tracking-tight">?</span>
+        </div>
+        <span id="letter-status" class="text-xs font-medium text-slate-400 mt-2 h-4">Várakozás...</span>
+      </div>
+
+      <!-- 8 OLDALÚ KOCKA (1-8) -->
+      <div class="flex flex-col items-center">
+        <span class="text-xs font-bold uppercase tracking-wider text-emerald-300 mb-3">2. Kocka · 8 oldalú (1–8)</span>
+        <div id="dice-number-box" class="relative w-36 h-36 md:w-44 md:h-44 flex items-center justify-center transition-all duration-200">
+          <!-- Oktaéder / d8 SVG háttér -->
+          <svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-xl">
+            <polygon id="poly-number" points="100,10 182,58 182,142 100,190 18,142 18,58"
+              fill="#064e3b" stroke="#34d399" stroke-width="6" stroke-linejoin="round" />
+            <polygon points="100,10 182,142 18,142"
+              fill="none" stroke="#10b981" stroke-width="2.5" stroke-opacity="0.45" stroke-linejoin="round" />
+          </svg>
+          <span id="number-value" class="absolute text-4xl md:text-5xl font-black text-white tracking-tight">?</span>
+        </div>
+        <span id="number-status" class="text-xs font-medium text-slate-400 mt-2 h-4">Várakozás...</span>
+      </div>
+
+    </div>
+
+    <!-- KÖZPONTI KOMBINÁLT EREDMÉNYJELZŐ (pl. 7B) -->
+    <div class="bg-slate-900/90 border border-slate-700 rounded-2xl p-5 text-center mb-6 min-h-[116px] flex flex-col items-center justify-center">
+      <span class="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-1">Kisorsolt eredmény</span>
+      <div id="combined-result" class="text-4xl md:text-5xl font-black text-slate-600 tracking-wider">
+        —
+      </div>
+      <p id="step-hint" class="text-xs text-slate-400 mt-1.5">Kattints a gombra (vagy nyomj Szóközt) a dobáshoz!</p>
+    </div>
+
+    <!-- DOBÁS GOMB ÉS OPCIÓ -->
+    <div class="flex flex-col sm:flex-row items-center gap-3 mb-6">
+      <button id="roll-btn" onclick="startRoll()"
+        class="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 active:scale-[0.99] text-slate-950 font-extrabold text-lg shadow-lg shadow-amber-500/20 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
+        🎲 Dobás indítása
+      </button>
+    </div>
+
+    <!-- ISMÉTLÉSMENTES MÓD KAPCSOLÓ -->
+    <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 pb-4 border-b border-slate-700/80">
+      <label class="inline-flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" id="no-repeat-toggle" onchange="resetPool()" class="rounded border-slate-600 bg-slate-700 text-amber-500 focus:ring-amber-500" />
+        <span>Ismétlésmentes mód (minden mező csak egyszer jöhet ki, összesen 32)</span>
+      </label>
+      <span id="remaining-badge" class="hidden font-semibold text-amber-400">Hátralévő: 32 / 32</span>
+    </div>
+
+    <!-- KORÁBBI DOBÁSOK ELŐZMÉNYEI -->
+    <div class="mt-4">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Előző dobások</span>
+        <button onclick="clearHistory()" class="text-xs text-slate-400 hover:text-rose-400 transition">Előzmények törlése</button>
+      </div>
+      <div id="history-list" class="flex flex-wrap gap-2 min-h-[32px] items-center">
+        <span class="text-xs text-slate-500 italic">Még nem történt dobás.</span>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const LETTERS = ["A", "B", "C", "D"];
+    const NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8];
+
+    let isRolling = false;
+    let history = [];
+    let availablePairs = [];
+
+    function buildFullPool() {
+      const pool = [];
+      for (const l of LETTERS) {
+        for (const n of NUMBERS) {
+          pool.push({ letter: l, number: n, code: `${n}${l}` });
+        }
+      }
+      return pool;
+    }
+
+    function resetPool() {
+      availablePairs = buildFullPool();
+      const noRepeat = document.getElementById("no-repeat-toggle").checked;
+      const badge = document.getElementById("remaining-badge");
+      if (noRepeat) {
+        badge.classList.remove("hidden");
+        badge.textContent = `Hátralévő: ${availablePairs.length} / 32`;
+      } else {
+        badge.classList.add("hidden");
+      }
+    }
+
+    resetPool();
+
+    function pickOutcome() {
+      const noRepeat = document.getElementById("no-repeat-toggle").checked;
+      if (!noRepeat) {
+        const letter = LETTERS[Math.floor(Math.random() * LETTERS.length)];
+        const number = NUMBERS[Math.floor(Math.random() * NUMBERS.length)];
+        return { letter, number, code: `${number}${letter}` };
+      }
+
+      if (availablePairs.length === 0) {
+        return null;
+      }
+      const idx = Math.floor(Math.random() * availablePairs.length);
+      const chosen = availablePairs.splice(idx, 1)[0];
+      document.getElementById("remaining-badge").textContent = `Hátralévő: ${availablePairs.length} / 32`;
+      return chosen;
+    }
+
+    function startRoll() {
+      if (isRolling) return;
+
+      const outcome = pickOutcome();
+      if (!outcome) {
+        alert("Mind a 32 kombináció (1A–8D) kisorsolásra került! Töröld az előzményeket az újrakezdéshez.");
+        return;
+      }
+
+      isRolling = true;
+      const btn = document.getElementById("roll-btn");
+      btn.disabled = true;
+      btn.textContent = "⏳ Sorsolás folyamatban...";
+
+      const letterBox = document.getElementById("dice-letter-box");
+      const numberBox = document.getElementById("dice-number-box");
+      const letterVal = document.getElementById("letter-value");
+      const numberVal = document.getElementById("number-value");
+      const letterStatus = document.getElementById("letter-status");
+      const numberStatus = document.getElementById("number-status");
+      const combinedEl = document.getElementById("combined-result");
+      const stepHint = document.getElementById("step-hint");
+      const polyLetter = document.getElementById("poly-letter");
+      const polyNumber = document.getElementById("poly-number");
+
+      // Alaphelyzetbe állítás az új dobáshoz
+      numberVal.textContent = "?";
+      numberStatus.textContent = "Várakozás a betűre...";
+      polyNumber.setAttribute("fill", "#064e3b");
+      polyNumber.setAttribute("stroke", "#34d399");
+
+      combinedEl.className = "text-4xl md:text-5xl font-black text-slate-500 tracking-wider";
+      combinedEl.textContent = "...";
+      stepHint.textContent = "1. lépés: Betű kisorsolása (A–D)...";
+
+      // 1. FÁZIS: Betűkocka pörgetése (900 ms)
+      letterBox.classList.add("rolling");
+      letterStatus.textContent = "Sorsolás...";
+      letterStatus.className = "text-xs font-bold text-indigo-300 mt-2 h-4";
+      polyLetter.setAttribute("fill", "#4338ca");
+      polyLetter.setAttribute("stroke", "#a5b4fc");
+
+      const letterInterval = setInterval(() => {
+        letterVal.textContent = LETTERS[Math.floor(Math.random() * LETTERS.length)];
+      }, 75);
+
+      setTimeout(() => {
+        clearInterval(letterInterval);
+        letterBox.classList.remove("rolling");
+        letterVal.textContent = outcome.letter;
+        letterStatus.textContent = `Kisorsolva: ${outcome.letter}`;
+        letterStatus.className = "text-xs font-bold text-emerald-400 mt-2 h-4";
+        polyLetter.setAttribute("fill", "#312e81");
+        polyLetter.setAttribute("stroke", "#818cf8");
+
+        // Részleges eredmény mutatása (pl. ?B)
+        combinedEl.className = "text-4xl md:text-5xl font-black text-indigo-300 tracking-wider";
+        combinedEl.textContent = `?${outcome.letter}`;
+        stepHint.textContent = `A betű megvan (${outcome.letter})! 2. lépés: Szám kisorsolása (1–8)...`;
+
+        // 2. FÁZIS: Számkocka pörgetése (1000 ms)
+        numberBox.classList.add("rolling");
+        numberStatus.textContent = "Sorsolás...";
+        numberStatus.className = "text-xs font-bold text-emerald-300 mt-2 h-4";
+        polyNumber.setAttribute("fill", "#047857");
+        polyNumber.setAttribute("stroke", "#6ee7b7");
+
+        const numberInterval = setInterval(() => {
+          numberVal.textContent = NUMBERS[Math.floor(Math.random() * NUMBERS.length)];
+        }, 70);
+
+        setTimeout(() => {
+          clearInterval(numberInterval);
+          numberBox.classList.remove("rolling");
+          numberVal.textContent = outcome.number;
+          numberStatus.textContent = `Kisorsolva: ${outcome.number}`;
+          numberStatus.className = "text-xs font-bold text-emerald-400 mt-2 h-4";
+          polyNumber.setAttribute("fill", "#064e3b");
+          polyNumber.setAttribute("stroke", "#34d399");
+
+          // VÉGEREDMÉNY MEGJELENÍTÉSE (pl. 7B)
+          combinedEl.className = "text-5xl md:text-6xl font-black text-amber-400 tracking-wider result-pop";
+          combinedEl.textContent = outcome.code;
+          stepHint.textContent = `Végeredmény: ${outcome.number} (szám) + ${outcome.letter} (betű) → ${outcome.code}`;
+
+          history.unshift(outcome.code);
+          renderHistory();
+
+          isRolling = false;
+          btn.disabled = false;
+          btn.textContent = "🎲 Új dobás";
+        }, 1000);
+
+      }, 900);
+    }
+
+    function renderHistory() {
+      const container = document.getElementById("history-list");
+      if (history.length === 0) {
+        container.innerHTML = `<span class="text-xs text-slate-500 italic">Még nem történt dobás.</span>`;
+        return;
+      }
+      container.innerHTML = history.map((code, idx) => `
+        <span class="px-3 py-1 rounded-lg text-sm font-extrabold border ${
+          idx === 0
+            ? "bg-amber-500/20 text-amber-300 border-amber-400/50"
+            : "bg-slate-700/70 text-slate-300 border-slate-600"
+        }">${code}</span>
+      `).join("");
+    }
+
+    function clearHistory() {
+      history = [];
+      resetPool();
+      renderHistory();
+      document.getElementById("letter-value").textContent = "?";
+      document.getElementById("number-value").textContent = "?";
+      document.getElementById("letter-status").textContent = "Várakozás...";
+      document.getElementById("letter-status").className = "text-xs font-medium text-slate-400 mt-2 h-4";
+      document.getElementById("number-status").textContent = "Várakozás...";
+      document.getElementById("number-status").className = "text-xs font-medium text-slate-400 mt-2 h-4";
+      const combinedEl = document.getElementById("combined-result");
+      combinedEl.className = "text-4xl md:text-5xl font-black text-slate-600 tracking-wider";
+      combinedEl.textContent = "—";
+      document.getElementById("step-hint").textContent = "Kattints a gombra (vagy nyomj Szóközt) a dobáshoz!";
+    }
+
+    // Szóköz vagy Enter billentyűre is dob
+    document.addEventListener("keydown", (e) => {
+      if ((e.code === "Space" || e.code === "Enter") && document.activeElement.tagName !== "INPUT") {
+        e.preventDefault();
+        startRoll();
+      }
+    });
+  </script>
+</body>
+</html>
